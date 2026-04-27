@@ -5,6 +5,8 @@ let yLines = [];
 function setup() {
   createCanvas(600, 600);
   initComposition();
+  let canvas = createCanvas(windowWidth, windowHeight);
+  canvas.parent("p5-container");
 }
 
 function draw() {
@@ -115,4 +117,8 @@ function drawLines() {
 
   for (let x of xLines) line(x, 0, x, height);
   for (let y of yLines) line(0, y, width, y);
+  //we need this window resized function to make sure the canvas resizes properly when the window size changes, ensuring the background remains full-screen and responsive
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+}
 }
