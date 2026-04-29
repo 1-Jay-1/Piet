@@ -2,72 +2,64 @@ let rects = [];
 let xLines = [];
 let yLines = [];
 
+const palette = [
+  [220, 50, 50],   // red
+  [50, 90, 220],   // blue
+  [240, 200, 50]   // yellow
+];
+
+let baseX = [];
+let baseY = [];
+
+let coloredRects = []; // FIFO queue, each keeps its own color forever
+
 function setup() {
   createCanvas(600, 600);
   initComposition();
-  let canvas = createCanvas(windowWidth, windowHeight);
-  canvas.parent("p5-container");
 }
 
 function draw() {
   background(255);
 
   animateGrid();
-  rebuildRects();
+
   drawRects();
   drawLines();
 }
 
-function mousePressed() {
-  initComposition();
-}
-
+// =====================
+// INIT
+// =====================
 
 function initComposition() {
   rects = [];
+  coloredRects = [];
 
-  let divisions = int(random(4, 6));
+  let divisions = int(random(5, 7));
 
   xLines = [0, width];
   yLines = [0, height];
 
+  baseX = [0, width];
+  baseY = [0, height];
+
   for (let i = 0; i < divisions; i++) {
-    xLines.push(random(width));
-    yLines.push(random(height));
+    let x = random(60, width - 60);
+    let y = random(60, height - 60);
+
+    xLines.push(x);
+    yLines.push(y);
+
+    baseX.push(x);
+    baseY.push(y);
   }
 
   xLines.sort((a, b) => a - b);
   yLines.sort((a, b) => a - b);
+  baseX.sort((a, b) => a - b);
+  baseY.sort((a, b) => a - b);
 
   buildRects();
-  assignColors();
-}
-
-function animateGrid() {
-  for (let i = 1; i < xLines.length - 1; i++) {
-    xLines[i] += sin(frameCount * 0.01 + i * 10) * 0.4;
-  }
-
-  for (let i = 1; i < yLines.length - 1; i++) {
-    yLines[i] += cos(frameCount * 0.01 + i * 10) * 0.4;
-  }
-
-  constrainLines();
-}
-
-function constrainLines() {
-  for (let i = 1; i < xLines.length - 1; i++) {
-    xLines[i] = constrain(xLines[i], 80, width - 80);
-  }
-
-  for (let i = 1; i < yLines.length - 1; i++) {
-    yLines[i] = constrain(yLines[i], 80, height - 80);
-  }
-}
-
-function rebuildRects() {
-  buildRects();
-  assignColors();
 }
 
 function buildRects() {
@@ -75,50 +67,111 @@ function buildRects() {
 
   for (let i = 0; i < xLines.length - 1; i++) {
     for (let j = 0; j < yLines.length - 1; j++) {
-      rects.push({
-        x: xLines[i],
-        y: yLines[j],
-        w: xLines[i + 1] - xLines[i],
-        h: yLines[j + 1] - yLines[j],
-        col: null
-      });
+      rects.push({ i, j });
     }
   }
 }
 
-function assignColors() {
-  let palette = [
-    color(220, 50, 50),   // red
-    color(50, 90, 220),   // blue
-    color(240, 200, 50)   // yellow
-  ];
+// =====================
+// ANIMATION
+// =====================
 
-  for (let r of rects) r.col = null;
+function animateGrid() {
+  for (let i = 1; i < xLines.length - 1; i++) {
+    let target = baseX[i];
+    xLines[i] = lerp(xLines[i], target + sin(frameCount * 0.01 + i) * 6, 0.08);
+  }
 
-  rects.sort((a, b) => (b.w * b.h) - (a.w * a.h));
-
-  for (let i = 0; i < 3; i++) {
-    rects[i].col = palette[i];
+  for (let i = 1; i < yLines.length - 1; i++) {
+    let target = baseY[i];
+    yLines[i] = lerp(yLines[i], target + cos(frameCount * 0.01 + i) * 6, 0.08);
   }
 }
+
+// =====================
+// CLICK (FIXED: NO COLOR CHANGES EVER)
+// =====================
+
+function mousePressed() {
+  for (let r of rects) {
+    let x = xLines[r.i];
+    let y = yLines[r.j];
+    let w = xLines[r.i + 1] - xLines[r.i];
+    let h = yLines[r.j + 1] - yLines[r.j];
+
+    if (
+      mouseX > x && mouseX < x + w &&
+      mouseY > y && mouseY < y + h
+    ) {
+
+      // remove oldest ONLY if over limit
+      if (coloredRects.length >= 3) {
+        coloredRects.shift(); // remove oldest
+      }
+
+      // prevent duplicate rect selection
+      if (coloredRects.some(c => c.r === r)) return;
+
+      // assign a color that is NOT currently used
+      let usedColors = coloredRects.map(c => c.color);
+      let available = palette.filter(p =>
+        !usedColors.some(u =>
+          u[0] === p[0] && u[1] === p[1] && u[2] === p[2]
+        )
+      );
+
+      if (available.length === 0) return;
+
+      let color = random(available);
+
+      // IMPORTANT: color is locked forever for this rect
+      coloredRects.push({ r, color });
+
+      break;
+    }
+  }
+}
+
+// =====================
+// DRAW
+// =====================
 
 function drawRects() {
   noStroke();
 
+  // base grid
   for (let r of rects) {
-    fill(r.col ? r.col : 255);
-    rect(r.x, r.y, r.w, r.h);
+    let x = xLines[r.i];
+    let y = yLines[r.j];
+    let w = xLines[r.i + 1] - xLines[r.i];
+    let h = yLines[r.j + 1] - yLines[r.j];
+
+    fill(245);
+    rect(x, y, w, h);
+  }
+
+  // draw colored rectangles (NO CHANGES EVER)
+  for (let c of coloredRects) {
+    let r = c.r;
+
+    let x = xLines[r.i];
+    let y = yLines[r.j];
+    let w = xLines[r.i + 1] - xLines[r.i];
+    let h = yLines[r.j + 1] - yLines[r.j];
+
+    fill(c.color[0], c.color[1], c.color[2]);
+    rect(x, y, w, h);
   }
 }
 
+// =====================
+// GRID LINES
+// =====================
+
 function drawLines() {
   stroke(0);
-  strokeWeight(8);
+  strokeWeight(6);
 
   for (let x of xLines) line(x, 0, x, height);
   for (let y of yLines) line(0, y, width, y);
-  //we need this window resized function to make sure the canvas resizes properly when the window size changes, ensuring the background remains full-screen and responsive
-function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-}
 }

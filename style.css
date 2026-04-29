@@ -2,17 +2,6 @@ html, body {
   margin: 0;
   padding: 0;
 }
-/* P5 BACKGROUND (Defining the parent p5 container in css)*/  
-#p5-container canvas{
-  position:fixed;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  z-index:0;
-  pointer-events:none;
-}
-
 canvas {
   display: block;
 }
